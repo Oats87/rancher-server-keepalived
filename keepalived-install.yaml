@@ -1,0 +1,64 @@
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: high-availability
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: keepalived
+  namespace: high-availability
+  labels:
+    k8s-app: keepalived
+spec:
+  selector:
+    matchLabels:
+      name: keepalived
+  template:
+    metadata:
+      labels:
+        name: keepalived
+    spec:
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/controlplane
+        operator: Exists
+      - effect: NoExecute
+        key: node-role.kubernetes.io/etcd
+        operator: Exists
+      hostNetwork: true
+      containers:
+      - name: keepalived
+        image: docker.io/oats87/rancher-server-keepalived:latest
+        volumeMounts:
+        - mountPath: /lib/modules
+          name: lib-modules
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        env:
+        - name: RANCHER_HOSTNAME
+          value: "demo1.rancher.space"
+        - name: IFACE
+          value: "eth0"
+        - name: VIP
+          value: "192.168.1.5"
+        - name: VRRP_PASS
+          value: "mypasswd"
+        - name: VR_ID
+          value: "54"
+        - name: PEERS
+          value: "192.168.1.2;192.168.1.3;192.168.1.4" # Set to the 3 rancher server master IPs
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /lib/modules
+          type: ""
+        name: lib-modules
